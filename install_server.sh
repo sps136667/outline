@@ -18,11 +18,11 @@
 # (to automatically update the server), and to create a new Outline user.
 
 # You may set the following environment variables, overriding their defaults:
-# SB_IMAGE: The Outline Server Docker image to install, e.g. quay.io/outline/shadowboxx:nightly
-# CONTAINER_NAME: Docker instance name for shadowboxx (default shadowboxx).
-#     For multiple instances also change shadowboxx_DIR to an other location
-#     e.g. CONTAINER_NAME=shadowboxx-inst1 shadowboxx_DIR=/opt/outline/inst2
-# shadowboxx_DIR: Directory for persistent Outline Server state.
+# SB_IMAGE: The Outline Server Docker image to install, e.g. quay.io/outline/SHADOWBOXx:nightly
+# CONTAINER_NAME: Docker instance name for SHADOWBOXx (default SHADOWBOXx).
+#     For multiple instances also change SHADOWBOXx_DIR to an other location
+#     e.g. CONTAINER_NAME=SHADOWBOXx-inst1 SHADOWBOXx_DIR=/opt/outline/inst1
+# SHADOWBOXx_DIR: Directory for persistent Outline Server state.
 # ACCESS_CONFIG: The location of the access config text file.
 # SB_DEFAULT_SERVER_NAME: Default name for this server, e.g. "Outline server New York".
 #     This name will be used for the server until the admins updates the name
@@ -175,7 +175,7 @@ function docker_container_exists() {
   docker ps | grep --quiet "$1"
 }
 
-function remove_shadowboxx_container() {
+function remove_SHADOWBOXx_container() {
   remove_docker_container "${CONTAINER_NAME}"
 }
 
@@ -234,7 +234,7 @@ function get_random_port {
 }
 
 function create_persisted_state_dir() {
-  readonly STATE_DIR="${shadowboxx_DIR}/persisted-state"
+  readonly STATE_DIR="${SHADOWBOXx_DIR}/persisted-state"
   mkdir -p "${STATE_DIR}"
   chmod ug+rwx,g+s,o-rwx "${STATE_DIR}"
 }
@@ -259,7 +259,7 @@ function generate_secret_key() {
 
 function generate_certificate() {
   # Generate self-signed cert and store it in the persistent state directory.
-  local -r CERTIFICATE_NAME="${STATE_DIR}/shadowboxx-selfsigned"
+  local -r CERTIFICATE_NAME="${STATE_DIR}/SHADOWBOXx-selfsigned"
   readonly SB_CERTIFICATE_FILE="${CERTIFICATE_NAME}.crt"
   readonly SB_PRIVATE_KEY_FILE="${CERTIFICATE_NAME}.key"
   declare -a openssl_req_flags=(
@@ -295,13 +295,13 @@ function write_config() {
   fi
   # printf is needed to escape the hostname.
   config+=("$(printf '"hostname": "%q"' "${PUBLIC_HOSTNAME}")")
-  echo "{$(join , "${config[@]}")}" > "${STATE_DIR}/shadowboxx_server_config.json"
+  echo "{$(join , "${config[@]}")}" > "${STATE_DIR}/SHADOWBOXx_server_config.json"
 }
 
-function start_shadowboxx() {
+function start_SHADOWBOXx() {
   # TODO(fortuna): Write API_PORT to config file,
   # rather than pass in the environment.
-  local -ar docker_shadowboxx_flags=(
+  local -ar docker_SHADOWBOXx_flags=(
     --name "${CONTAINER_NAME}" --restart always --net host
     --label 'com.centurylinklabs.watchtower.enable=true'
     -v "${STATE_DIR}:${STATE_DIR}"
@@ -315,7 +315,7 @@ function start_shadowboxx() {
   )
   # By itself, local messes up the return code.
   local STDERR_OUTPUT
-  STDERR_OUTPUT="$(docker run -d "${docker_shadowboxx_flags[@]}" "${SB_IMAGE}" 2>&1 >/dev/null)" && return
+  STDERR_OUTPUT="$(docker run -d "${docker_SHADOWBOXx_flags[@]}" "${SB_IMAGE}" 2>&1 >/dev/null)" && return
   readonly STDERR_OUTPUT
   log_error "FAILED"
   if docker_container_exists "${CONTAINER_NAME}"; then
@@ -349,7 +349,7 @@ function start_watchtower() {
 }
 
 # Waits for the service to be up and healthy
-function wait_shadowboxx() {
+function wait_SHADOWBOXx() {
   # We use insecure connection because our threat model doesn't include localhost port
   # interception and our certificate doesn't have localhost as a subject alternative name
   until fetch --insecure "${LOCAL_API_URL}/access-keys" >/dev/null; do sleep 1; done
@@ -413,7 +413,7 @@ function set_hostname() {
   return 1
 }
 
-install_shadowboxx() {
+install_SHADOWBOXx() {
   local MACHINE_TYPE
   MACHINE_TYPE="$(uname -m)"
   if [[ "${MACHINE_TYPE}" != "x86_64" ]]; then
@@ -424,15 +424,15 @@ install_shadowboxx() {
   # Make sure we don't leak readable files to other users.
   umask 0007
 
-  export CONTAINER_NAME="${CONTAINER_NAME:-shadowboxx}"
+  export CONTAINER_NAME="${CONTAINER_NAME:-SHADOWBOXx}"
 
   run_step "Verifying that Docker is installed" verify_docker_installed
   run_step "Verifying that Docker daemon is running" verify_docker_running
 
   log_for_sentry "Creating Outline directory"
-  export shadowboxx_DIR="${shadowboxx_DIR:-/opt/outline}"
-  mkdir -p "${shadowboxx_DIR}"
-  chmod u+s,ug+rwx,o-rwx "${shadowboxx_DIR}"
+  export SHADOWBOXx_DIR="${SHADOWBOXx_DIR:-/opt/outline}"
+  mkdir -p "${SHADOWBOXx_DIR}"
+  chmod u+s,ug+rwx,o-rwx "${SHADOWBOXx_DIR}"
 
   log_for_sentry "Setting API port"
   API_PORT="${FLAGS_API_PORT}"
@@ -440,8 +440,8 @@ install_shadowboxx() {
     API_PORT=${SB_API_PORT:-$(get_random_port)}
   fi
   readonly API_PORT
-  readonly ACCESS_CONFIG="${ACCESS_CONFIG:-${shadowboxx_DIR}/access.txt}"
-  readonly SB_IMAGE="${SB_IMAGE:-quay.io/outline/shadowboxx:stable}"
+  readonly ACCESS_CONFIG="${ACCESS_CONFIG:-${SHADOWBOXx_DIR}/access.txt}"
+  readonly SB_IMAGE="${SB_IMAGE:-quay.io/outline/SHADOWBOXx:stable}"
 
   PUBLIC_HOSTNAME="${FLAGS_HOSTNAME:-${SB_PUBLIC_IP:-}}"
   if [[ -z "${PUBLIC_HOSTNAME}" ]]; then
@@ -465,16 +465,16 @@ install_shadowboxx() {
   run_step "Writing config" write_config
 
   # TODO(dborkan): if the script fails after docker run, it will continue to fail
-  # as the names shadowboxx and watchtower will already be in use.  Consider
+  # as the names SHADOWBOXx and watchtower will already be in use.  Consider
   # deleting the container in the case of failure (e.g. using a trap, or
   # deleting existing containers on each run).
-  run_step "Starting shadowboxx" start_shadowboxx
-  # TODO(fortuna): Don't wait for shadowboxx to run this.
+  run_step "Starting SHADOWBOXx" start_SHADOWBOXx
+  # TODO(fortuna): Don't wait for SHADOWBOXx to run this.
   run_step "Starting Watchtower" start_watchtower
 
   readonly PUBLIC_API_URL="https://${PUBLIC_HOSTNAME}:${API_PORT}/${SB_API_PREFIX}"
   readonly LOCAL_API_URL="https://localhost:${API_PORT}/${SB_API_PREFIX}"
-  run_step "Waiting for Outline server to be healthy" wait_shadowboxx
+  run_step "Waiting for Outline server to be healthy" wait_SHADOWBOXx
   run_step "Creating first user" create_first_user
   run_step "Adding API URL to config" add_api_url_to_config
 
@@ -502,7 +502,7 @@ $(echo -e "\033[1;32m{\"apiUrl\":\"$(get_field_value apiUrl)\",\"certSha256\":\"
 
 ${FIREWALL_STATUS}
 END_OF_SERVER_OUTPUT
-} # end of install_shadowboxx
+} # end of install_SHADOWBOXx
 
 function is_valid_port() {
   (( 0 < "$1" && "$1" <= 65535 ))
@@ -560,7 +560,7 @@ function main() {
   declare -i FLAGS_API_PORT=0
   declare -i FLAGS_KEYS_PORT=0
   parse_flags "$@"
-  install_shadowboxx
+  install_SHADOWBOXx
 }
 
 main "$@"
